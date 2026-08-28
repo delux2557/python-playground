@@ -1,0 +1,12 @@
+{
+  "status": "done",
+  "message": "训练完成 · 对随机最终胜率 0.74",
+  "episode": 200,
+  "episodes": 200,
+  "win_rate": 0.7417,
+  "epsilon": 0.0,
+  "opponent_pool": 0,
+  "started_at": "2026-08-27T14:46:18",
+  "updated_at": "2026-08-27T14:47:14",
+  "game": "othello"
+}

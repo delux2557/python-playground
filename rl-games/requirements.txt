@@ -1,0 +1,9 @@
+# 运行时依赖(生产/容器用)
+# torch 用 CPU 版:训练规模小,CPU 足够;镜像也小得多(约 300MB vs 2GB+)
+# 注意:torch 从官方 CPU 源安装,别用默认源(会拉 GPU 大包)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+numpy
+fastapi
+uvicorn
+mlflow

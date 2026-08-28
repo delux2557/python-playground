@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>贪吃蛇 · DQN 驾驶舱</title>
+<link rel="stylesheet" href="/shared/frontend/common.css" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ======================= 顶部导航 ======================= -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+        <path d="M5 25h18a6 6 0 0 0 0-12h-3l4-5H9l-4 5h4l-4 4v8z" fill="currentColor"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <h1>贪吃蛇 · DQN 驾驶舱</h1>
+      <p>强化学习入门 · 看看模型到底在想什么</p>
+    </div>
+  </div>
+
+  <div class="mode-switch" role="tablist" aria-label="游戏模式">
+    <button id="mode-ai" class="mode-btn active" data-mode="ai">AI 演示</button>
+    <button id="mode-human" class="mode-btn" data-mode="human">人玩</button>
+  </div>
+
+  <div class="model-pick">
+    <span class="model-label">模型</span>
+    <select id="model-select" class="model-select" title="切换已登记的模型"></select>
+  </div>
+
+  <div class="badges">
+    <div class="badge" id="badge-model" title="模型来源">
+      <span class="dot"></span><span id="model-name">加载中…</span>
+    </div>
+    <div class="badge" id="badge-epsilon">ε <span id="eps-val">–</span></div>
+    <div class="badge score">得分 <span id="hud-score">0</span></div>
+  </div>
+</header>
+
+<!-- ======================= 主布局 ======================= -->
+<main class="layout">
+
+  <!-- 左列:游戏画面 -->
+  <section class="col-left">
+    <div class="card game-card">
+      <div class="card-head">
+        <h2>游戏画面</h2>
+        <span class="chip" id="game-chip">AI 演示中</span>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="game-canvas" width="440" height="440"></canvas>
+        <div class="game-overlay" id="game-overlay" hidden>
+          <p class="overlay-title" id="overlay-title">本局结束</p>
+          <p class="overlay-sub" id="overlay-sub"></p>
+          <button class="btn btn-primary" id="btn-restart">再来一局</button>
+        </div>
+      </div>
+
+      <div class="game-hud">
+        <div class="hud-item"><span class="hud-label">得分</span><span class="hud-val" id="hud-score2">0</span></div>
+        <div class="hud-item"><span class="hud-label">步数</span><span class="hud-val" id="hud-steps">0</span></div>
+        <div class="hud-item"><span class="hud-label">上步奖励</span><span class="hud-val" id="hud-reward">–</span></div>
+        <div class="hud-item"><span class="hud-label">结果</span><span class="hud-val" id="hud-reason">进行中</span></div>
+      </div>
+
+      <div class="speed-controls">
+        <button class="ctl-btn" data-speed="0.5" title="慢速">慢 ×0.5</button>
+        <button class="ctl-btn active" data-speed="1" title="正常">×1</button>
+        <button class="ctl-btn" data-speed="4" title="快速">×4</button>
+        <button class="ctl-btn" data-speed="8" title="极速">×8</button>
+        <span class="ctl-divider"></span>
+        <button class="ctl-btn" id="btn-pause" title="暂停/继续">暂停</button>
+        <button class="ctl-btn" id="btn-step" title="手动走一步">单步</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右列:驾驶舱分析(Tab 切换) -->
+  <section class="col-right">
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="panel-decision" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="4" r="2.2" fill="currentColor"/><circle cx="4" cy="16" r="2.2" fill="currentColor"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/><path d="M10 6.5L5.5 14m9 0L10 6.5m-3 7.5h6" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+        模型决策
+      </button>
+      <button class="tab" data-tab="panel-training" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="2" y="10" width="3" height="8" rx="1" fill="currentColor"/><rect x="8.5" y="5" width="3" height="13" rx="1" fill="currentColor"/><rect x="15" y="2" width="3" height="16" rx="1" fill="currentColor"/></svg>
+        训练进度
+      </button>
+    </div>
+
+    <!-- Tab 面板:模型决策(Q 值 + 状态网格 + 观察输入) -->
+    <div class="tab-panel" id="panel-decision">
+
+      <div class="card decision-card">
+        <div class="card-head">
+          <h2>本次决策 · Q 值</h2>
+          <span class="chip chip-ai" id="chip-action">待决策</span>
+        </div>
+        <p class="card-desc">模型认为每个方向"未来能拿到的总回报",选 Q 值最大的走。</p>
+        <div class="q-bars" id="q-bars"></div>
+        <div class="decision-meta">
+          <span class="meta-pill" id="meta-epsilon">ε 0.01</span>
+          <span class="meta-pill" id="meta-reward">奖励 –</span>
+          <span class="meta-pill" id="meta-steps">步数 0</span>
+        </div>
+      </div>
+
+      <div class="card obs-card">
+        <div class="card-head">
+          <h2>模型观察输入 · 11 维</h2>
+          <span class="chip chip-muted">obs 向量</span>
+        </div>
+        <p class="card-desc">这是模型每步真正"看到"的输入:危险标记 / 食物方向 / 当前方向 / 饥饿度。</p>
+        <div class="obs-bars" id="obs-bars"></div>
+      </div>
+    </div>
+
+    <!-- Tab 面板:训练进度(曲线 + 参数) -->
+    <div class="tab-panel" id="panel-training" hidden>
+
+      <div class="card curve-card">
+        <div class="card-head">
+          <h2>训练曲线</h2>
+          <span class="chip chip-muted" id="curve-note">data/curve.json</span>
+        </div>
+        <p class="card-desc">训练时每隔 N 局用"纯贪心"评估一次的平均得分。曲线向上 = 模型在变强。</p>
+        <div class="chart-wrap">
+          <canvas id="curve-canvas" width="560" height="220"></canvas>
+        </div>
+        <div class="chart-legend">
+          <span><i class="lg lg-scores"></i>每点平均分</span>
+          <span><i class="lg lg-max"></i>历史最高</span>
+          <span><i class="lg lg-avg"></i>累计平均</span>
+        </div>
+      </div>
+
+      <div class="card config-card">
+        <div class="card-head">
+          <h2>训练参数</h2>
+          <span class="chip chip-muted">决定模型怎么学</span>
+        </div>
+        <div class="config-grid" id="config-grid"><!-- JS 填充 --></div>
+      </div>
+
+    </div>
+
+  </section>
+</main>
+
+<footer class="foot">
+  <p>强化学习四要素:<b>状态 s</b> · <b>动作 a</b> · <b>奖励 r</b> · <b>策略 π</b>。Q 值 = 对"长期回报"的估计,ε = 探索概率(越往后越认真)。</p>
+</footer>
+
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

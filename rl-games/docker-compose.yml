@@ -1,0 +1,55 @@
+# docker-compose.yml —— 本地一键起全套:两个游戏的 Web + 一个训练 worker
+#
+# 用法:
+#   docker compose up -d            # 起服务(第一次会 build 镜像)
+#   open http://localhost:8001      # 黑白棋驾驶舱
+#   open http://localhost:8002      # 贪吃蛇驾驶舱
+#   docker compose logs -f worker   # 看训练进度
+#   docker compose down             # 停(数据留在命名卷里)
+#
+# 拓扑:web 只读、worker 只写,通过两个命名卷共享(模型/注册表/曲线/MLflow),
+# 完全对应"训练/Web 解耦"的设计——加 worker 只是换个进程跑训练而已。
+
+services:
+  # ---- Web:黑白棋驾驶舱(8001) ----
+  web-othello:
+    build: .
+    image: rl-games:latest
+    command: uvicorn othello.serve:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - models:/app/models
+      - data:/app/data
+    restart: unless-stopped
+
+  # ---- Web:贪吃蛇驾驶舱(8002) ----
+  web-snake:
+    image: rl-games:latest
+    command: uvicorn snake.serve:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8002:8002"
+    volumes:
+      - models:/app/models
+      - data:/app/data
+    depends_on:
+      - web-othello        # 共用同一镜像,保证先构建
+    restart: unless-stopped
+
+  # ---- 训练 worker:黑白棋自对弈(可多开,互不冲突) ----
+  worker:
+    image: rl-games:latest
+    command: python othello/train.py --episodes 2000 --checkpoint models/othello.pt
+    environment:
+      # MLflow 跟踪库放进 data 卷,训练完的模型实验记录持久化、可查
+      MLFLOW_TRACKING_URI: sqlite:///data/mlflow.db
+    volumes:
+      - models:/app/models
+      - data:/app/data
+    depends_on:
+      - web-othello
+    restart: "no"           # 训练是"跑一次"的任务,不自动重启
+
+volumes:
+  models:
+  data:

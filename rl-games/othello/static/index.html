@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>黑白棋 · DQN 驾驶舱</title>
+<link rel="stylesheet" href="/shared/frontend/common.css" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ======================= 顶部导航 ======================= -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+        <circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="2.5"/>
+        <circle cx="16" cy="16" r="5" fill="currentColor"/>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <h1>黑白棋 · DQN 驾驶舱</h1>
+      <p>强化学习入门 · 人机对战 + 模型对战 + 整局复盘</p>
+    </div>
+  </div>
+
+  <div class="mode-switch" role="tablist" aria-label="对战设置">
+    <button id="p-black" class="mode-btn active" data-human="black">人执黑</button>
+    <button id="p-white" class="mode-btn" data-human="white">人执白</button>
+    <button id="p-none" class="mode-btn" data-human="none">纯 AI 对战</button>
+  </div>
+
+  <div class="model-pick">
+    <span class="model-label">模型</span>
+    <select id="model-select" class="model-select" title="切换已登记的模型"></select>
+  </div>
+
+  <div class="badges">
+    <div class="badge" id="badge-model" title="模型来源">
+      <span class="dot"></span><span id="model-name">加载中…</span>
+    </div>
+    <div class="badge" id="badge-epsilon">ε <span id="eps-val">–</span></div>
+  </div>
+</header>
+
+<!-- ======================= 主布局 ======================= -->
+<main class="layout">
+
+  <!-- 左列:棋盘 -->
+  <section class="col-left">
+    <div class="card game-card">
+      <div class="card-head">
+        <h2>棋盘 · 8×8</h2>
+        <span class="chip" id="turn-chip">加载中…</span>
+      </div>
+      <p class="card-desc" id="board-desc">人执黑先手。轮到人时点绿点落子;AI 思考中会自动出招。</p>
+
+      <div class="board-wrap">
+        <canvas id="board-canvas" width="440" height="440"></canvas>
+        <div class="game-overlay" id="game-overlay" hidden>
+          <p class="overlay-title" id="overlay-title">本局结束</p>
+          <p class="overlay-sub" id="overlay-sub"></p>
+          <button class="btn btn-primary" id="btn-restart">再来一局</button>
+        </div>
+      </div>
+
+      <!-- 整局复盘回放控制条(默认隐藏,复盘时出现) -->
+      <div class="replay-bar" id="replay-bar" hidden>
+        <div class="replay-title" id="replay-title">整局复盘</div>
+        <div class="replay-controls">
+          <button class="rp-btn" id="rp-start" title="回到开头">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 5h2v14H6zM18 5v14l-9-7z"/></svg>
+          </button>
+          <button class="rp-btn" id="rp-prev" title="上一步">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 5h2v14H7zM17 5v14l-8-7z"/></svg>
+          </button>
+          <button class="rp-btn rp-play" id="rp-play" title="播放 / 暂停">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5l11 7-11 7z"/></svg>
+          </button>
+          <button class="rp-btn" id="rp-next" title="下一步">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 5l9 7-9 7zM15 5h2v14h-2z"/></svg>
+          </button>
+          <button class="rp-btn" id="rp-end" title="到最后">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M4 5l10 7-10 7zM16 5h2v14h-2z"/></svg>
+          </button>
+        </div>
+        <input type="range" id="rp-slider" class="rp-slider" min="0" max="0" value="0" />
+        <div class="replay-meta">
+          <span id="rp-counter" class="rp-counter">0 / 0</span>
+          <button class="ctl-btn" id="rp-exit">退出复盘</button>
+        </div>
+      </div>
+
+      <!-- 子数计分条:黑 vs 白 -->
+      <div class="score-bar">
+        <div class="score-side black">
+          <span class="score-dot black-dot"></span>黑 <b id="count-black">2</b>
+        </div>
+        <div class="score-vs">VS</div>
+        <div class="score-side white">
+          <b id="count-white">2</b> 白 <span class="score-dot white-dot"></span>
+        </div>
+      </div>
+
+      <div class="game-hud">
+        <div class="hud-item"><span class="hud-label">轮到</span><span class="hud-val" id="hud-turn">黑</span></div>
+        <div class="hud-item"><span class="hud-label">已落子</span><span class="hud-val" id="hud-steps">0</span></div>
+        <div class="hud-item"><span class="hud-label">上步翻转</span><span class="hud-val" id="hud-flips">–</span></div>
+        <div class="hud-item"><span class="hud-label">模型 ε</span><span class="hud-val" id="hud-eps">–</span></div>
+      </div>
+
+      <div class="speed-controls">
+        <span class="ctl-label">AI 间隔</span>
+        <button class="ctl-btn" data-delay="120" title="快速">快</button>
+        <button class="ctl-btn active" data-delay="400" title="正常">中</button>
+        <button class="ctl-btn" data-delay="900" title="慢速">慢</button>
+        <span class="ctl-divider"></span>
+        <button class="ctl-btn" id="btn-autoplay" title="纯AI对战:自动连下">自动对战</button>
+        <button class="ctl-btn" id="btn-step" title="让当前方走一步">单步</button>
+        <span class="ctl-divider"></span>
+        <button class="ctl-btn" id="btn-undo" title="悔棋:撤销最近一步" disabled>悔棋</button>
+        <button class="ctl-btn ctl-accent" id="btn-replay" title="整局复盘回放" disabled>复盘回放</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右列:驾驶舱分析(Tab 切换) -->
+  <section class="col-right">
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="panel-decision" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="4" r="2.2" fill="currentColor"/><circle cx="4" cy="16" r="2.2" fill="currentColor"/><circle cx="16" cy="16" r="2.2" fill="currentColor"/><path d="M10 6.5L5.5 14m9 0L10 6.5m-3 7.5h6" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+        模型决策
+      </button>
+      <button class="tab" data-tab="panel-training" role="tab">
+        <svg class="tab-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="2" y="10" width="3" height="8" rx="1" fill="currentColor"/><rect x="8.5" y="5" width="3" height="13" rx="1" fill="currentColor"/><rect x="15" y="2" width="3" height="16" rx="1" fill="currentColor"/></svg>
+        训练进度
+      </button>
+    </div>
+
+    <!-- ====== Tab 面板:模型决策(Q 值排序 + 观察输入) ====== -->
+    <div class="tab-panel" id="panel-decision">
+      <div class="card decision-card">
+        <div class="card-head">
+          <h2>候选落子 · Q 值排序</h2>
+          <span class="chip chip-ai" id="chip-action">待决策</span>
+        </div>
+        <p class="card-desc">当前落子方各合法位置按 Q 值从高到低。b3 表示第 b 列第 3 行。</p>
+        <div class="q-bars-wrap">
+          <div class="q-bars" id="q-bars"></div>
+        </div>
+      </div>
+
+      <div class="card obs-card">
+        <div class="card-head">
+          <h2>模型观察输入 · 192 维</h2>
+          <span class="chip chip-muted">3 通道</span>
+        </div>
+        <p class="card-desc">3 个通道:己方棋子 / 对方棋子 / 空格。每个格子 0/1,
+          当前落子方视角(黑或白都能用同一个网络)。</p>
+        <div class="obs-bars" id="obs-bars"></div>
+        <button class="obs-expand" id="btn-obs-expand">▸ 展开 8×8 网格</button>
+      </div>
+
+      <div class="card qheat-card">
+        <div class="card-head">
+          <h2>Q 值热力图 · 模型眼中的"好棋"</h2>
+          <span class="chip chip-muted">绿=高 Q 红=低 Q</span>
+        </div>
+        <p class="card-desc">棋盘上的色块 = 当前落子方每个合法落子的 Q 值(模型估计的长期回报)。颜色越绿说明模型越看好这一步。</p>
+        <div class="heat-legend">
+          <span>低 Q</span>
+          <span class="grad"></span>
+          <span>高 Q</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Tab 面板:训练进度(曲线 + 状态 + 参数) ====== -->
+    <div class="tab-panel" id="panel-training" hidden>
+      <div class="card curve-card">
+        <div class="card-head">
+          <h2>训练曲线 · 对随机胜率</h2>
+          <span class="chip chip-muted" id="curve-note">data/othello_curve.json</span>
+        </div>
+        <p class="card-desc">自对弈训练时,每隔 N 局用"纯贪心"对战随机对手量一次胜率。
+          从 50% 往上爬 = 模型在变强。</p>
+        <div class="chart-wrap">
+          <canvas id="curve-canvas" width="560" height="200"></canvas>
+        </div>
+        <div class="chart-legend">
+          <span><i class="lg lg-scores"></i>每次评估胜率</span>
+          <span><i class="lg lg-avg"></i>累计平均</span>
+        </div>
+      </div>
+
+      <div class="card train-card">
+        <div class="card-head">
+          <h2>训练状态 · 实时进度</h2>
+          <span class="chip chip-muted" id="train-badge">未开始</span>
+        </div>
+        <p class="card-desc">训练在独立进程跑(<code>python othello/train.py</code>),
+          与 Web 只通过文件通信(训练/Web 解耦)。这里每 2 秒轮询一次,曲线跟着实时刷新。</p>
+        <div class="train-grid">
+          <div class="train-block">
+            <span class="train-label">局数</span>
+            <span class="train-val" id="train-episode">–</span>
+          </div>
+          <div class="train-block">
+            <span class="train-label">对随机胜率</span>
+            <span class="train-val" id="train-winrate">–</span>
+          </div>
+          <div class="train-block">
+            <span class="train-label">ε 探索率</span>
+            <span class="train-val" id="train-epsilon">–</span>
+          </div>
+          <div class="train-block">
+            <span class="train-label">对手池</span>
+            <span class="train-val" id="train-pool">–</span>
+          </div>
+        </div>
+        <div class="train-bar"><div class="train-fill" id="train-fill"></div></div>
+        <div class="train-msg" id="train-msg">尚未开始训练</div>
+      </div>
+
+      <div class="card config-card">
+        <div class="card-head">
+          <h2>训练参数</h2>
+          <span class="chip chip-muted">自对弈 · DQN</span>
+        </div>
+        <div class="config-grid" id="config-grid"><!-- JS 填充 --></div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<!-- ======================= 模型工具(折叠):模型对战 + 竞技场打榜 ======================= -->
+<section class="tools-section" id="tools-section">
+  <div class="tools-bar">
+    <button class="tools-toggle" id="btn-tools-toggle" aria-expanded="false">
+      <svg class="tools-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+        <path d="M4 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm12 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM10 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" fill="currentColor"/>
+      </svg>
+      模型工具
+      <span class="tools-badge">高级</span>
+      <span class="tools-arrow" id="tools-arrow">▸</span>
+    </button>
+  </div>
+  <div class="tools-body" id="tools-body" hidden>
+
+    <!-- 模型对战 -->
+    <div class="card duel-card">
+      <div class="card-head">
+        <h2>模型对战 · 谁更强</h2>
+        <span class="chip chip-muted" id="duel-badge">待开始</span>
+      </div>
+      <p class="card-desc">从注册表里挑两个已登记模型,一黑一白打多局,用比分说话。</p>
+
+      <div class="duel-pit">
+        <div class="duel-fighter f-black">
+          <div class="fighter-avatar"><span class="fdisc fdisc-black"></span></div>
+          <div class="fighter-body">
+            <div class="fighter-side">黑方</div>
+            <select id="duel-black" class="duel-select" title="黑方模型"></select>
+            <div class="fighter-score" id="duel-black-score">—</div>
+          </div>
+        </div>
+        <div class="duel-vs"><span>VS</span></div>
+        <div class="duel-fighter f-white">
+          <div class="fighter-avatar"><span class="fdisc fdisc-white"></span></div>
+          <div class="fighter-body">
+            <div class="fighter-side">白方</div>
+            <select id="duel-white" class="duel-select" title="白方模型"></select>
+            <div class="fighter-score" id="duel-white-score">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="duel-setup">
+        <div class="duel-games">
+          <span class="ctl-label">局数</span>
+          <input id="duel-games" type="number" min="1" max="100" step="1" value="10" class="duel-games-input" title="对局局数(1~100)" />
+        </div>
+        <button class="btn btn-primary" id="btn-duel-start">开始对战</button>
+        <button class="ctl-btn" id="btn-duel-clear" title="清空对战结果">清空</button>
+      </div>
+
+      <div class="duel-score" id="duel-score" hidden>
+        <div class="duel-winbar">
+          <div class="dw dblack" id="dw-black"></div>
+          <div class="dw ddraw" id="dw-draw"></div>
+          <div class="dw dwhite" id="dw-white"></div>
+        </div>
+        <div class="duel-wins">
+          <div class="duel-win"><span id="duel-black-wins" class="dw-num wb">0</span><span class="duel-win-label">黑胜</span></div>
+          <div class="duel-win"><span id="duel-draws" class="dw-num wd">0</span><span class="duel-win-label">平</span></div>
+          <div class="duel-win"><span id="duel-white-wins" class="dw-num ww">0</span><span class="duel-win-label">白胜</span></div>
+        </div>
+        <div class="duel-progress"><div class="duel-progress-fill" id="duel-progress-fill"></div></div>
+        <div class="duel-progress-text">
+          <span id="duel-progress-text">0 / 0 局</span>
+          <span class="duel-winrate" id="duel-winrate">—</span>
+        </div>
+      </div>
+
+      <div class="duel-games-list" id="duel-games-list" hidden><!-- JS 填充 --></div>
+
+      <div class="duel-regions" id="duel-regions" hidden>
+        <div class="duel-regions-head">
+          <h3>分区胜率热力图</h3>
+          <span class="chip chip-muted" id="duel-regions-samples">样本 —</span>
+        </div>
+        <div class="region-legend"><span>0%</span><span class="grad"></span><span>100%</span></div>
+        <div class="region-grid" id="region-grid"><!-- JS 填充 8×8 --></div>
+        <div class="region-bars" id="region-bars"><!-- JS 填充 角/边/中心 --></div>
+      </div>
+    </div>
+
+    <!-- 竞技场打榜 -->
+    <div class="card arena-card">
+      <div class="card-head">
+        <h2>竞技场 · 打榜</h2>
+        <span class="chip chip-muted" id="arena-badge">待开始</span>
+      </div>
+      <p class="card-desc">统一评测给全体模型重打分;循环赛两两对战排出总榜。</p>
+
+      <div class="bench-block">
+        <div class="bench-head">
+          <span class="bench-title">统一评测基准 · 对战随机</span>
+          <button class="ctl-btn" id="btn-benchmark" title="固定种子,给全体模型重打分">重新评测</button>
+        </div>
+        <div class="bench-list" id="bench-list">
+          <div class="bench-empty">尚未评测 —— 点「重新评测」打分</div>
+        </div>
+      </div>
+
+      <div class="arena-setup">
+        <span class="ctl-label">每对局数</span>
+        <input id="arena-games" type="number" min="1" max="50" step="1" value="10"
+               class="duel-games-input" title="每对选手各执黑/白打的局数" />
+        <button class="btn btn-primary" id="btn-arena-start">开始循环赛</button>
+        <button class="ctl-btn" id="btn-arena-clear" title="清空排行榜">清空</button>
+      </div>
+
+      <div class="arena-progress" id="arena-progress" hidden>
+        <div class="arena-progress-fill" id="arena-progress-fill"></div>
+        <div class="arena-progress-text" id="arena-progress-text">0 / 0 场</div>
+      </div>
+
+      <div class="arena-board" id="arena-board" hidden>
+        <table class="arena-table">
+          <thead>
+            <tr><th>名次</th><th>选手</th><th>积分</th><th>胜率</th>
+                <th>胜/平/负</th><th>统一分</th></tr>
+          </thead>
+          <tbody id="arena-tbody"><!-- JS 填充 --></tbody>
+        </table>
+      </div>
+      <div class="arena-empty" id="arena-empty">尚未开始循环赛 —— 点「开始循环赛」让全体模型互相切磋</div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="foot">
+  <p>黑白棋是双人零和博弈:你多一子、对手就少一子,所以奖励只在终局给(+1 胜 / -1 负 / 0 平)。
+    自对弈 = 让模型和"以前的自己"下棋,互相磨炼;模型对战 = 把两个已登记模型放进同一张棋盘,用比分直接判断谁更强。</p>
+</footer>
+
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

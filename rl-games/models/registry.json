@@ -1,0 +1,50 @@
+{
+  "snake-20260827-132635": {
+    "game": "snake",
+    "algorithm": "dqn",
+    "path": "models/snake.pt",
+    "hidden_dims": [
+      64,
+      64
+    ],
+    "eval_score": 14.95,
+    "episodes": 3000,
+    "created_at": "2026-08-27T13:26:35"
+  },
+  "othello-20260827-144315-941011": {
+    "game": "othello",
+    "algorithm": "dqn-selfplay",
+    "path": "models/othello.pt",
+    "hidden_dims": [
+      128,
+      128
+    ],
+    "eval_score": 0.8167,
+    "episodes": 120,
+    "created_at": "2026-08-27T14:43:15.941054"
+  },
+  "othello-20260827-144432-576104": {
+    "game": "othello",
+    "algorithm": "dqn-selfplay",
+    "path": "models/othello.pt",
+    "hidden_dims": [
+      128,
+      128
+    ],
+    "eval_score": 0.8167,
+    "episodes": 400,
+    "created_at": "2026-08-27T14:44:32.576142"
+  },
+  "othello-20260827-144714-057065": {
+    "game": "othello",
+    "algorithm": "dqn-selfplay",
+    "path": "models/othello.pt",
+    "hidden_dims": [
+      128,
+      128
+    ],
+    "eval_score": 0.8167,
+    "episodes": 200,
+    "created_at": "2026-08-27T14:47:14.057101"
+  }
+}

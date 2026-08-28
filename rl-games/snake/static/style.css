@@ -1,0 +1,55 @@
+/* =========================================================================
+   style.css —— 贪吃蛇驾驶舱特有样式
+   公共布局 / tokens / 组件已抽到 /shared/frontend/common.css(两个游戏共用)。
+   这里只保留贪吃蛇特有的:画布 / 决策元信息 / 观察输入布局。
+   ========================================================================= */
+
+/* 贪吃蛇特有配色(覆盖公共 --bg-grad 的角光色,其余 tokens 用公共默认) */
+:root {
+  --bg-grad: radial-gradient(1200px 800px at 80% -10%, rgba(124,108,255,.10), transparent 60%),
+             radial-gradient(900px 600px at -10% 110%, rgba(34,211,238,.06), transparent 55%),
+             var(--bg);
+  --snake-a: #22c55e;
+  --snake-b: #0ea5e9;
+  --food: #fb7185;
+}
+
+/* 得分徽章(顶部导航里) */
+.badge.score { color: var(--text); }
+.badge.score span { color: var(--brand-strong); font-weight: 700; }
+
+/* ---------------- 游戏画布 ---------------- */
+.game-card { padding-bottom: 14px; }
+.canvas-wrap { position: relative; }
+#game-canvas {
+  width: 100%; aspect-ratio: 1/1; display: block;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-radius: 12px;
+}
+
+/* 上步奖励正/负着色 */
+#hud-reward.pos { color: var(--green); } #hud-reward.neg { color: var(--danger); }
+
+/* ---------------- 决策元信息条 ---------------- */
+.decision-meta { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.meta-pill {
+  font-size: 12px; font-family: var(--font-mono); color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 5px 10px; border-radius: 999px;
+}
+.meta-pill.win { color: var(--green); border-color: rgba(46,230,168,.35); }
+.meta-pill.lose { color: var(--danger); border-color: rgba(248,113,113,.35); }
+
+/* ---------------- 观察输入(两列布局 + 按类别着色) ---------------- */
+.obs-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.obs-item { display: flex; align-items: center; gap: 8px; }
+.obs-label { width: 62px; font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.obs-track { flex: 1; height: 12px; }
+.obs-val { width: 38px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-align: right; }
+.obs-item.danger .obs-fill { background: var(--danger); }
+.obs-item.food .obs-fill { background: var(--food); }
+.obs-item.dir .obs-fill { background: var(--brand); }
+.obs-item.hunger .obs-fill { background: var(--warning); }
+
+/* 历史最高线图例(贪吃蛇曲线多一条线) */
+.lg-max { background: var(--green); }

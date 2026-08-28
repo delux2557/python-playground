@@ -1,0 +1,21 @@
+# ---- Python 缓存与虚拟环境 ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- 训练产物（各项目可覆盖）----
+mlruns/
+mlflow.db
+*.pt.meta.json
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- 日志 ----
+*.log

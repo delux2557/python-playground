@@ -1,0 +1,19 @@
+# .dockerignore —— 别把本地大文件/缓存塞进镜像
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+tests
+mlflow.db
+mlruns/
+data/*
+!data/.gitkeep
+# 预训练模型要进镜像:首次挂载命名卷时,Docker 会从镜像把 /app/models
+# 内容复制进卷——若这里排除掉,部署后 models/ 卷是空的,预训练模型就丢了。
+# 排除的是训练过程产生的其它临时产物(models/* 之外没有别的,此规则仅为
+# 防止未来在 models/ 下放日志等大文件)。
+models/*
+!models/*.pt
+!models/registry.json
+.git
+*.tmp
