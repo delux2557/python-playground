@@ -1,6 +1,6 @@
 # rl-games 运维手册
 
-> 目标主机：VMware 虚拟机 `think@192.168.19.129`（Ubuntu 24, kernel 6.8）
+> 目标主机：VMware 虚拟机 `<USER>@<VM-IP>`（Ubuntu 24, kernel 6.8）
 > 部署目录：`~/rl-games/`
 > 首次部署日期：2026-08-28
 
@@ -10,13 +10,13 @@
 
 | 项 | 值 |
 |---|---|
-| 主机 | myserver (192.168.19.129) |
+| 主机 | <HOSTNAME> (<VM-IP>) |
 | 系统 | Ubuntu 24.04, kernel 6.8.0-138 |
-| SSH | `ssh think@192.168.19.129`（已配免密） |
+| SSH | `ssh <USER>@<VM-IP>`（已配免密） |
 | Docker | 29.7.2 |
 | Docker Compose | v5.5.0 |
 | 镜像 | `rl-games:latest`（python:3.12-slim 基础 + torch CPU + mlflow） |
-| 部署路径 | `/home/think/rl-games/` |
+| 部署路径 | `/home/<USER>/rl-games/` |
 
 ---
 
@@ -38,7 +38,7 @@
 
 ## 3. 日常运维命令
 
-> 以下命令均在 VM 上 `~/rl-games/` 目录执行（先 `ssh think@192.168.19.129`，再 `cd ~/rl-games`）。
+> 以下命令均在 VM 上 `~/rl-games/` 目录执行（先 `ssh <USER>@<VM-IP>`，再 `cd ~/rl-games`）。
 
 ### 3.1 启动 / 停止
 
@@ -111,8 +111,8 @@ docker volume ls | grep rl-games
 - http://localhost:8002 — 贪吃蛇
 
 从 Windows 访问（三种方式，详见第 6 节）：
-- 直连：http://192.168.19.129:8001 （需 VM 防火墙放行）
-- SSH 隧道：`ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 think@192.168.19.129`，再访问 http://localhost:8001
+- 直连：http://<VM-IP>:8001 （需 VM 防火墙放行）
+- SSH 隧道：`ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 <USER>@<VM-IP>`，再访问 http://localhost:8001
 
 ---
 
@@ -126,17 +126,17 @@ docker volume ls | grep rl-games
 # 方式 A：本地打包传（推荐，适合大改）
 # 在 Windows 本地项目根目录：
 tar -czf rl-games.tar.gz rl-games/
-scp rl-games.tar.gz think@192.168.19.129:/tmp/
-ssh think@192.168.19.129 "cd ~/rl-games && tar -xzf /tmp/rl-games.tar.gz --strip-components=1"
+scp rl-games.tar.gz <USER>@<VM-IP>:/tmp/
+ssh <USER>@<VM-IP> "cd ~/rl-games && tar -xzf /tmp/rl-games.tar.gz --strip-components=1"
 
 # 方式 B：只传改动的文件（适合小改）
-scp othello/serve.py think@192.168.19.129:~/rl-games/othello/serve.py
+scp othello/serve.py <USER>@<VM-IP>:~/rl-games/othello/serve.py
 ```
 
 ### 4.2 重建并重启
 
 ```bash
-ssh think@192.168.19.129 "cd ~/rl-games && docker compose up -d --build"
+ssh <USER>@<VM-IP> "cd ~/rl-games && docker compose up -d --build"
 ```
 
 `--build` 会重新构建镜像。由于 Dockerfile 先 `COPY requirements.txt` 再 `COPY . .`，**如果只改了代码没动依赖，依赖层命中缓存，重建只需几秒**；改了 `requirements.txt` 才会重装依赖（约 6-9 分钟）。
@@ -146,7 +146,7 @@ ssh think@192.168.19.129 "cd ~/rl-games && docker compose up -d --build"
 新版本的 `docker-compose.yml` 和 `.dockerignore` 是原始版本，每次用新代码覆盖后需要重加两个部署补丁：
 
 ```bash
-ssh think@192.168.19.129 "cd ~/rl-games && \
+ssh <USER>@<VM-IP> "cd ~/rl-games && \
   # 补丁1: PYTHONPATH (compose 三服务加 environment: PYTHONPATH /app)
   # 见 ~/rl-games/docker-compose.yml.orig 备份,或用 sed 补丁
   # 补丁2: .dockerignore 排除 mlruns/ (MLflow 产物 14MB+,不该进镜像)
@@ -176,8 +176,8 @@ docker compose ps
 用法：
 ```bash
 # Windows 侧
-scp rl-games.tar.gz think@192.168.19.129:/tmp/
-ssh think@192.168.19.129 "bash ~/rl-games/update.sh"
+scp rl-games.tar.gz <USER>@<VM-IP>:/tmp/
+ssh <USER>@<VM-IP> "bash ~/rl-games/update.sh"
 ```
 
 ---
@@ -207,7 +207,7 @@ docker run --rm rl-games:latest python snake/train.py --help
 **旧的手动灌卷命令（仅历史参考，不再需要）**：
 
 ```bash
-ssh think@192.168.19.129 "cd ~/rl-games && \
+ssh <USER>@<VM-IP> "cd ~/rl-games && \
   docker compose cp models/othello.pt web-othello:/app/models/othello.pt && \
   docker compose cp models/snake.pt web-othello:/app/models/snake.pt && \
   docker compose cp models/registry.json web-othello:/app/models/registry.json"
@@ -244,7 +244,7 @@ sudo ufw allow 8001/tcp
 sudo ufw allow 8002/tcp
 ```
 
-然后 Windows 浏览器访问 http://192.168.19.129:8001
+然后 Windows 浏览器访问 http://<VM-IP>:8001
 
 ### 方式二：SSH 本地端口转发（推荐，安全）
 
@@ -252,7 +252,7 @@ sudo ufw allow 8002/tcp
 
 ```bash
 # 在 Windows Git Bash 执行（窗口保持开着）
-ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 think@192.168.19.129
+ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 <USER>@<VM-IP>
 ```
 
 然后访问 http://localhost:8001 / http://localhost:8002。Ctrl+C 关闭隧道。
@@ -260,7 +260,7 @@ ssh -N -L 8001:localhost:8001 -L 8002:localhost:8002 think@192.168.19.129
 ### 方式三：后台 SSH 隧道
 
 ```bash
-ssh -fN -L 8001:localhost:8001 -L 8002:localhost:8002 think@192.168.19.129
+ssh -fN -L 8001:localhost:8001 -L 8002:localhost:8002 <USER>@<VM-IP>
 ```
 
 ---
